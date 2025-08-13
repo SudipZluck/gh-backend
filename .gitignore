@@ -1,6 +1,7 @@
-.__pycache__/
+__pycache__/
 .cursor/
-.grateful-heart/
+# .grateful-heart/lib/
+grateful-heart/lib/
 .vscode/
 *.py[cod]
 .env
