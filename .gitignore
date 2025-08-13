@@ -1,5 +1,6 @@
+.__pycache__/
 .cursor/
 .grateful-heart/
 .vscode/
-.__pycache__/
+*.py[cod]
 .env
