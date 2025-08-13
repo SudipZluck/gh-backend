@@ -1,0 +1,5 @@
+.cursor/
+.grateful-heart/
+.vscode/
+.__pycache__/
+.env
