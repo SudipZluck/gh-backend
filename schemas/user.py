@@ -14,7 +14,7 @@ class UserResponse(BaseModel):
     id: int
     email: EmailStr
     name: str
-    token: str
+    token: str | None = None
     about: str | None = None
     phone: str | None = None
     address: str | None = None
@@ -28,6 +28,11 @@ class UserResponse(BaseModel):
     is_active: bool | None = None
     created_at: datetime.datetime | None = None
     updated_at: datetime.datetime | None = None
+
+class SignupResponse(BaseModel):
+    id: int
+    email: EmailStr
+    name: str
 
 class APIResponse(BaseModel):
     message: str

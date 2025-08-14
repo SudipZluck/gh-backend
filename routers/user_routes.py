@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
-from random import random
+from datetime import datetime, timedelta, timezone
+from random import choices, random
 import string
 from typing import Annotated, List
 
@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from db.sqlmodel import get_session
 from models.user import ForgetPassword, User, UserNotifications, UserReports, UserSocialLinks
 from schemas.common import APIResponse
-from schemas.user import ForgetPasswordReset, SignupRequest, LoginRequest, UserNotificationResponse, UserNotificationUpdate, UserReportCreate, UserReportResponse, UserResponse, LoginResponse, ForgetPasswordRequest, UserSocialLinkCreate, UserSocialLinkResponse
+from schemas.user import ForgetPasswordReset, SignupRequest, LoginRequest, SignupResponse, UserNotificationResponse, UserNotificationUpdate, UserReportCreate, UserReportResponse, UserResponse, LoginResponse, ForgetPasswordRequest, UserSocialLinkCreate, UserSocialLinkResponse
 from security.jwt import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from security.dependencies import get_current_user
 
@@ -27,12 +27,12 @@ def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
 
-def user_to_response(user: User) -> APIResponse[UserResponse]:
-    payload = UserResponse(id=user.id, email=user.email, name=user.name)
-    return APIResponse[UserResponse](message="User created successfully", data=payload)
+def user_to_response(user: User) -> APIResponse[SignupResponse]:
+    payload = SignupResponse(id=user.id, email=user.email, name=user.name)
+    return APIResponse[SignupResponse](message="User created successfully", data=payload)
 
 
-async def _signup_user(data: SignupRequest, session: Session) -> APIResponse[UserResponse]:
+async def _signup_user(data: SignupRequest, session: Session) -> APIResponse[SignupResponse]:
     existing = session.exec(select(User).where(User.email == data.email)).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -44,7 +44,7 @@ async def _signup_user(data: SignupRequest, session: Session) -> APIResponse[Use
     return user_to_response(user)
 
 
-@router.post("/signup", response_model=APIResponse[UserResponse])
+@router.post("/signup", response_model=APIResponse[SignupResponse])
 async def signup(payload: Annotated[SignupRequest,...], session: Annotated[Session, Depends(get_session)]):
     return await _signup_user(payload, session)
 
@@ -62,7 +62,7 @@ async def login(payload: Annotated[LoginRequest, ...], session: Annotated[Sessio
 
     return APIResponse[UserResponse](message="Login successful", data=user_payload)
 
-@router.post("/forget-password", response_model=APIResponse)
+@router.post("/forget-password", response_model=APIResponse, response_model_exclude_none=True)
 async def forget_password(
     request: ForgetPasswordRequest,
     session: Annotated[Session, Depends(get_session)],
@@ -73,8 +73,8 @@ async def forget_password(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    otp = "".join(random.choices(string.digits, k=6))
-    expire_time = datetime.now(datetime.timezone.utc) + timedelta(minutes=10)
+    otp = "".join(choices(string.digits, k=6))
+    expire_time = datetime.now(timezone.utc) + timedelta(minutes=10)
 
     forget_password_entry = session.get(ForgetPassword, request.email)
     if forget_password_entry:
@@ -91,18 +91,20 @@ async def forget_password(
     # For this example, we will just return it in the response.
     return APIResponse(
         message="OTP sent to your email",
-        data={"otp": otp},
-        success=True,
-        status="success",
-        code=status.HTTP_200_OK,
     )
 
-@router.post("/reset-password", response_model=APIResponse)
+@router.post("/reset-password", response_model=APIResponse, response_model_exclude_none=True)
 async def reset_password(
     request: ForgetPasswordReset,
     session: Annotated[Session, Depends(get_session)],
 ):
     forget_password_entry = session.get(ForgetPassword, request.email)
+    user = session.exec(select(User).where(User.email == request.email)).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
     if not forget_password_entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invalid request"
@@ -116,24 +118,12 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OTP"
         )
 
-    user = session.exec(select(User).where(User.email == request.email)).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-
     user.password_hash = hash_password(request.new_password)
     session.add(user)
     session.delete(forget_password_entry)
     session.commit()
 
-    return APIResponse(
-        message="Password reset successfully",
-        data={},
-        success=True,
-        status="success",
-        code=status.HTTP_200_OK,
-    )
+    return APIResponse(message="Password reset successfully")
 
 
 @router.post("/social-links", response_model=APIResponse[UserSocialLinkResponse])
