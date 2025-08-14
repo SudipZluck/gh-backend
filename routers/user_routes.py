@@ -13,6 +13,7 @@ from schemas.common import APIResponse
 from schemas.user import ForgetPasswordReset, SignupRequest, LoginRequest, SignupResponse, UserNotificationResponse, UserNotificationUpdate, UserReportCreate, UserReportResponse, UserResponse, LoginResponse, ForgetPasswordRequest, UserSocialLinkCreate, UserSocialLinkResponse
 from security.jwt import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from security.dependencies import get_current_user
+from services.mail_service import send_mail
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -86,6 +87,7 @@ async def forget_password(
         )
     session.add(forget_password_entry)
     session.commit()
+    await send_mail(otp, user.name, user.email)
 
     # Here you would send the OTP to the user's email.
     # For this example, we will just return it in the response.
@@ -122,7 +124,6 @@ async def reset_password(
     session.add(user)
     session.delete(forget_password_entry)
     session.commit()
-
     return APIResponse(message="Password reset successfully")
 
 
