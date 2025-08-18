@@ -5,3 +5,5 @@ grateful-heart/lib/
 .vscode/
 *.py[cod]
 .env
+.specstory/**
+.cursorindexingignore

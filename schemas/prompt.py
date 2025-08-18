@@ -1,25 +1,26 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 
 class PromptCreate(BaseModel):
     text: str
-    category: Optional[str] = None
 
 
 class PromptResponse(BaseModel):
     id: int
     text: str
-    category: Optional[str] = None
+    user_id: Optional[int] = None
     is_active: bool
+    created_at: datetime
 
 
 class UserPromptCreate(BaseModel):
-    prompt_text: str
+    text: str
 
 
 class UserPromptResponse(BaseModel):
     id: int
     user_id: int
-    prompt_text: str
+    text: str
     is_active: bool
