@@ -127,7 +127,7 @@ async def reset_password(
     return APIResponse(message="Password reset successfully")
 
 
-@router.post("/social-links", response_model=APIResponse[UserSocialLinkResponse])
+@router.post("/create-social-links", response_model=APIResponse[UserSocialLinkResponse])
 async def create_social_link(
     social_link_data: UserSocialLinkCreate,
     session: Annotated[Session, Depends(get_session)],
@@ -142,13 +142,10 @@ async def create_social_link(
     return APIResponse(
         message="Social link created successfully",
         data=social_link,
-        success=True,
-        status="success",
-        code=status.HTTP_201_CREATED,
     )
 
 
-@router.get("/social-links", response_model=APIResponse[List[UserSocialLinkResponse]])
+@router.get("/get-social-links", response_model=APIResponse[List[UserSocialLinkResponse]])
 async def get_social_links(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -159,13 +156,10 @@ async def get_social_links(
     return APIResponse(
         message="Social links retrieved successfully",
         data=social_links,
-        success=True,
-        status="success",
-        code=status.HTTP_200_OK,
     )
 
 
-@router.delete("/social-links/{social_link_id}", response_model=APIResponse)
+@router.delete("/delete-social-links/{social_link_id}", response_model=APIResponse)
 async def delete_social_link(
     social_link_id: int,
     session: Annotated[Session, Depends(get_session)],
@@ -181,15 +175,11 @@ async def delete_social_link(
     session.commit()
     return APIResponse(
         message="Social link deleted successfully",
-        data={},
-        success=True,
-        status="success",
-        code=status.HTTP_200_OK,
     )
 
 
 @router.put(
-    "/notifications", response_model=APIResponse[UserNotificationResponse]
+    "/update-notifications", response_model=APIResponse[UserNotificationResponse]
 )
 async def update_notifications(
     notification_data: UserNotificationUpdate,
@@ -212,14 +202,11 @@ async def update_notifications(
     return APIResponse(
         message="Notification settings updated successfully",
         data=notification_settings,
-        success=True,
-        status="success",
-        code=status.HTTP_200_OK,
     )
 
 
 @router.get(
-    "/notifications", response_model=APIResponse[UserNotificationResponse]
+    "/get-notifications", response_model=APIResponse[UserNotificationResponse]
 )
 async def get_notifications(
     session: Annotated[Session, Depends(get_session)],
@@ -238,12 +225,9 @@ async def get_notifications(
     return APIResponse(
         message="Notification settings retrieved successfully",
         data=notification_settings,
-        success=True,
-        status="success",
-        code=status.HTTP_200_OK,
     )
 
-@router.post("/user-reports", response_model=APIResponse[UserReportResponse])
+@router.post("/create-user-reports", response_model=APIResponse[UserReportResponse])
 async def create_user_report(
     user_report_data: UserReportCreate,
     session: Annotated[Session, Depends(get_session)],
