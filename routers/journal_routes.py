@@ -216,6 +216,80 @@ async def get_journals_by_tag(
     )
 
 
+@router.get("/get-user-journals", response_model=APIResponse[List[JournalFeedResponse]])
+async def get_user_journals(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    skip: int = 0,
+    limit: int = 10,
+):
+    statement = (
+        select(Journal)
+        .options(selectinload(Journal.user), selectinload(Journal.comments), selectinload(Journal.tags))
+        .where(Journal.is_deleted == False, Journal.user_id == current_user.id)
+        .order_by(Journal.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    journals = session.exec(statement).all()
+
+    if not journals:
+        return APIResponse(
+            message="Journals retrieved successfully",
+            data=[],
+            success=True,
+        )
+
+    journal_ids = [journal.id for journal in journals]
+
+    shares_counts_result = session.exec(
+        select(JournalShares.journal_id, func.count(JournalShares.id))
+        .where(JournalShares.journal_id.in_(journal_ids))
+        .group_by(JournalShares.journal_id)
+    ).all()
+    shares_map = dict(shares_counts_result)
+
+    user_favorites_result = session.exec(
+        select(JournalFavorites.journal_id).where(
+            JournalFavorites.journal_id.in_(journal_ids),
+            JournalFavorites.user_id == current_user.id,
+        )
+    ).all()
+    favorite_journal_ids = set(user_favorites_result)
+
+    feed: List[JournalFeedResponse] = []
+    for journal in journals:
+        user_data = JournalFeedUserResponse(
+            id=journal.user.id,
+            name=journal.user.name,
+            profile_image_url=journal.user.profile_image_url,
+        )
+        tags = [TagResponse(id=tag.id, name=tag.name) for tag in journal.tags]
+
+        feed.append(
+            JournalFeedResponse(
+                id=journal.id,
+                user=user_data,
+                image_url=journal.image_url,
+                title=journal.title,
+                body_snippet=journal.body_snippet,
+                html_content=journal.html_content,
+                created_at=journal.created_at,
+                comment_count=len(journal.comments),
+                share_count=shares_map.get(journal.id, 0),
+                is_favorite=journal.id in favorite_journal_ids,
+                tags=tags,
+                is_private=journal.is_private,
+            )
+        )
+
+    return APIResponse(
+        message="Journals retrieved successfully",
+        data=feed,
+        success=True,
+    )
+
+
 @router.get("/{journal_id}", response_model=APIResponse[JournalResponse])
 async def get_journal_by_id(
     journal_id: int,
@@ -232,6 +306,154 @@ async def get_journal_by_id(
         success=True,
         status="success",
         code=status.HTTP_200_OK,
+    )
+
+@router.get("/user/{user_id}", response_model=APIResponse[List[JournalFeedResponse]])
+async def get_journals_by_user(
+    user_id: int,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    skip: int = 0,
+    limit: int = 10,
+):
+    statement = (
+        select(Journal)
+        .options(selectinload(Journal.user), selectinload(Journal.comments), selectinload(Journal.tags))
+        .where(Journal.is_deleted == False, Journal.user_id == user_id)
+        .order_by(Journal.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    journals = session.exec(statement).all()
+
+    if not journals:
+        return APIResponse(
+            message="Journals retrieved successfully",
+            data=[],
+            success=True,
+        )
+
+    journal_ids = [journal.id for journal in journals]
+
+    shares_counts_result = session.exec(
+        select(JournalShares.journal_id, func.count(JournalShares.id))
+        .where(JournalShares.journal_id.in_(journal_ids))
+        .group_by(JournalShares.journal_id)
+    ).all()
+    shares_map = dict(shares_counts_result)
+
+    user_favorites_result = session.exec(
+        select(JournalFavorites.journal_id).where(
+            JournalFavorites.journal_id.in_(journal_ids),
+            JournalFavorites.user_id == current_user.id,
+        )
+    ).all()
+    favorite_journal_ids = set(user_favorites_result)
+
+    feed: List[JournalFeedResponse] = []
+    for journal in journals:
+        user_data = JournalFeedUserResponse(
+            id=journal.user.id,
+            name=journal.user.name,
+            profile_image_url=journal.user.profile_image_url,
+        )
+        tags = [TagResponse(id=tag.id, name=tag.name) for tag in journal.tags]
+
+        feed.append(
+            JournalFeedResponse(
+                id=journal.id,
+                user=user_data,
+                image_url=journal.image_url,
+                title=journal.title,
+                body_snippet=journal.body_snippet,
+                html_content=journal.html_content,
+                created_at=journal.created_at,
+                comment_count=len(journal.comments),
+                share_count=shares_map.get(journal.id, 0),
+                is_favorite=journal.id in favorite_journal_ids,
+                tags=tags,
+                is_private=journal.is_private,
+            )
+        )
+
+    return APIResponse(
+        message="Journals retrieved successfully",
+        data=feed,
+        success=True,
+    )
+
+
+@router.get("/my", response_model=APIResponse[List[JournalFeedResponse]])
+async def get_my_journals(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    skip: int = 0,
+    limit: int = 10,
+):
+    statement = (
+        select(Journal)
+        .options(selectinload(Journal.user), selectinload(Journal.comments), selectinload(Journal.tags))
+        .where(Journal.is_deleted == False, Journal.user_id == current_user.id)
+        .order_by(Journal.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    journals = session.exec(statement).all()
+
+    if not journals:
+        return APIResponse(
+            message="Journals retrieved successfully",
+            data=[],
+            success=True,
+        )
+
+    journal_ids = [journal.id for journal in journals]
+
+    shares_counts_result = session.exec(
+        select(JournalShares.journal_id, func.count(JournalShares.id))
+        .where(JournalShares.journal_id.in_(journal_ids))
+        .group_by(JournalShares.journal_id)
+    ).all()
+    shares_map = dict(shares_counts_result)
+
+    user_favorites_result = session.exec(
+        select(JournalFavorites.journal_id).where(
+            JournalFavorites.journal_id.in_(journal_ids),
+            JournalFavorites.user_id == current_user.id,
+        )
+    ).all()
+    favorite_journal_ids = set(user_favorites_result)
+
+    feed: List[JournalFeedResponse] = []
+    for journal in journals:
+        user_data = JournalFeedUserResponse(
+            id=journal.user.id,
+            name=journal.user.name,
+            profile_image_url=journal.user.profile_image_url,
+        )
+        tags = [TagResponse(id=tag.id, name=tag.name) for tag in journal.tags]
+
+        feed.append(
+            JournalFeedResponse(
+                id=journal.id,
+                user=user_data,
+                image_url=journal.image_url,
+                title=journal.title,
+                body_snippet=journal.body_snippet,
+                html_content=journal.html_content,
+                created_at=journal.created_at,
+                comment_count=len(journal.comments),
+                share_count=shares_map.get(journal.id, 0),
+                is_favorite=journal.id in favorite_journal_ids,
+                tags=tags,
+                is_private=journal.is_private,
+            )
+        )
+
+    return APIResponse(
+        message="Journals retrieved successfully",
+        data=feed,
+        success=True,
     )
 
 
