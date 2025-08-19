@@ -102,3 +102,19 @@ class UserReportResponse(BaseModel):
     reporter_id: int
     reason: str
     status: str
+
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    name: Optional[str] = None
+    about: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    twitter_url: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    youtube_url: Optional[str] = None
+    tiktok_url: Optional[str] = None
+    website_url: Optional[str] = None
+    is_active: Optional[bool] = None

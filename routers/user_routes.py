@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from db.sqlmodel import get_session
 from models.user import ForgetPassword, User, UserNotifications, UserReports, UserSocialLinks
 from schemas.common import APIResponse
-from schemas.user import ForgetPasswordReset, SignupRequest, LoginRequest, SignupResponse, UserNotificationResponse, UserNotificationUpdate, UserReportCreate, UserReportResponse, UserResponse, LoginResponse, ForgetPasswordRequest, UserSocialLinkCreate, UserSocialLinkResponse
+from schemas.user import ForgetPasswordReset, SignupRequest, LoginRequest, SignupResponse, UserNotificationResponse, UserNotificationUpdate, UserReportCreate, UserReportResponse, UserResponse, LoginResponse, ForgetPasswordRequest, UserSocialLinkCreate, UserSocialLinkResponse, UserUpdate
 from security.jwt import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from security.dependencies import get_current_user
 from services.mail_service import send_mail
@@ -125,6 +125,43 @@ async def reset_password(
     session.delete(forget_password_entry)
     session.commit()
     return APIResponse(message="Password reset successfully")
+
+
+@router.get("/details", response_model=APIResponse[UserResponse])
+async def get_me(
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return APIResponse(message="User retrieved successfully", data=current_user)
+
+@router.post("/update", response_model=APIResponse[UserResponse])
+async def update_user_details(
+    payload: UserUpdate,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if not update_data:
+        return APIResponse(message="No fields to update", data=current_user)
+
+    if "email" in update_data and update_data["email"] != current_user.email:
+        existing = session.exec(select(User).where(User.email == update_data["email"])) .first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+
+    for key, value in update_data.items():
+        setattr(current_user, key, value)
+
+    current_user.updated_at = datetime.utcnow()
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+
+    return APIResponse(message="User updated successfully", data=current_user)
 
 
 @router.post("/create-social-links", response_model=APIResponse[UserSocialLinkResponse])

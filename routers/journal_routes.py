@@ -1,9 +1,32 @@
 from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, select, func
 from models.user import User
-from models.journal import Journal, JournalTags, JournalReactions, JournalFavorites, JournalShares, JournalReports
-from schemas.journal import JournalCreate, JournalResponse, JournalUpdate, JournalTagCreate, JournalTagResponse, JournalReactionCreate, JournalReactionResponse, JournalFavoriteCreate, JournalFavoriteResponse, JournalShareCreate, JournalShareResponse, JournalReportCreate, JournalReportResponse
+from models.journal import (
+    Journal,
+    Tag,
+    JournalReactions,
+    JournalFavorites,
+    JournalShares,
+    JournalReports,
+)
+from schemas.journal import (
+    JournalCreate,
+    JournalResponse,
+    JournalUpdate,
+    JournalReactionCreate,
+    JournalReactionResponse,
+    JournalFavoriteCreate,
+    JournalFavoriteResponse,
+    JournalShareCreate,
+    JournalShareResponse,
+    JournalReportCreate,
+    JournalReportResponse,
+    JournalFeedResponse,
+    JournalFeedUserResponse,
+    TagResponse,
+)
 from security.dependencies import get_current_user
 from db.sqlmodel import get_session
 from schemas.common import APIResponse
@@ -17,34 +40,178 @@ async def create_journal(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    journal = Journal(**journal_data.model_dump(), user_id=current_user.id)
+    journal_dict = journal_data.model_dump(exclude={"tags"})
+    journal = Journal(**journal_dict, user_id=current_user.id)
+
+    if journal_data.tags:
+        for tag_name in journal_data.tags:
+            tag = session.exec(select(Tag).where(Tag.name == tag_name)).first()
+            if not tag:
+                tag = Tag(name=tag_name)
+                session.add(tag)
+            journal.tags.append(tag)
+
     session.add(journal)
     session.commit()
     session.refresh(journal)
     return APIResponse(
         message="Journal created successfully",
         data=journal,
-        success=True,
-        status="success",
-        code=status.HTTP_201_CREATED,
     )
 
 
-@router.get("/", response_model=APIResponse[List[JournalResponse]])
+@router.get("/", response_model=APIResponse[List[JournalFeedResponse]])
 async def get_all_journals(
     session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
     skip: int = 0,
     limit: int = 10,
 ):
-    journals = session.exec(
-        select(Journal).where(Journal.is_deleted == False).offset(skip).limit(limit)
+    # Subquery to count shares for each journal
+    share_count_subquery = (
+        select(func.count(JournalShares.id))
+        .where(JournalShares.journal_id == Journal.id)
+        .label("share_count")
+    )
+
+    # Subquery to check if the journal is a favorite for the current user
+    is_favorite_subquery = (
+        select(JournalFavorites.id)
+        .where(
+            JournalFavorites.journal_id == Journal.id,
+            JournalFavorites.user_id == current_user.id,
+        )
+        .exists()
+        .label("is_favorite")
+    )
+
+    statement = (
+        select(
+            Journal
+        )
+        .options(selectinload(Journal.user), selectinload(Journal.comments), selectinload(Journal.tags))
+        .where(Journal.is_deleted == False)
+        .offset(skip)
+        .limit(limit)
+    )
+    journals = session.exec(statement).all()
+
+    if not journals:
+        return APIResponse(
+            message="Journals retrieved successfully",
+            data=[],
+            success=True,
+        )
+
+    journal_ids = [journal.id for journal in journals]
+
+    shares_counts_result = session.exec(
+        select(JournalShares.journal_id, func.count(JournalShares.id))
+        .where(JournalShares.journal_id.in_(journal_ids))
+        .group_by(JournalShares.journal_id)
     ).all()
+    shares_map = dict(shares_counts_result)
+
+    user_favorites_result = session.exec(
+        select(JournalFavorites.journal_id).where(
+            JournalFavorites.journal_id.in_(journal_ids),
+            JournalFavorites.user_id == current_user.id,
+        )
+    ).all()
+    favorite_journal_ids = set(user_favorites_result)
+
+    feed = []
+    for journal in journals:
+        user_data = JournalFeedUserResponse(
+            id=journal.user.id,
+            name=journal.user.name,
+            profile_image_url=journal.user.profile_image_url,
+        )
+
+        tags = [TagResponse(id=tag.id, name=tag.name) for tag in journal.tags]
+
+        feed.append(
+            JournalFeedResponse(
+                id=journal.id,
+                user=user_data,
+                image_url=journal.image_url,
+                title=journal.title,
+                body_snippet=journal.body_snippet,
+                html_content=journal.html_content,
+                created_at=journal.created_at,
+                comment_count=len(journal.comments),
+                share_count=shares_map.get(journal.id, 0),
+                is_favorite=journal.id in favorite_journal_ids,
+                tags=tags,
+                is_private=journal.is_private,
+            )
+        )
     return APIResponse(
         message="Journals retrieved successfully",
-        data=journals,
+        data=feed,
         success=True,
-        status="success",
-        code=status.HTTP_200_OK,
+    )
+
+
+@router.get("/tags/{tag_name}", response_model=APIResponse[List[JournalFeedResponse]])
+async def get_journals_by_tag(
+    tag_name: str,
+    session: Annotated[Session, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    tag = session.exec(select(Tag).where(Tag.name == tag_name)).first()
+    if not tag:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
+        )
+
+    journals = tag.journals
+
+    feed = []
+    for journal in journals:
+        user_data = JournalFeedUserResponse(
+            id=journal.user.id,
+            name=journal.user.name,
+            profile_image_url=journal.user.profile_image_url,
+        )
+
+        comment_count = len(journal.comments)
+        share_count = len(
+            session.exec(
+                select(JournalShares).where(JournalShares.journal_id == journal.id)
+            ).all()
+        )
+        is_favorite = bool(
+            session.exec(
+                select(JournalFavorites).where(
+                    JournalFavorites.journal_id == journal.id,
+                    JournalFavorites.user_id == current_user.id,
+                )
+            ).first()
+        )
+        tags = [TagResponse(id=tag.id, name=tag.name) for tag in journal.tags]
+
+        feed.append(
+            JournalFeedResponse(
+                id=journal.id,
+                user=user_data,
+                image_url=journal.image_url,
+                title=journal.title,
+                body_snippet=journal.body_snippet,
+                html_content=journal.html_content,
+                created_at=journal.created_at,
+                comment_count=comment_count,
+                share_count=share_count,
+                is_favorite=is_favorite,
+                tags=tags,
+                is_private=journal.is_private,
+            )
+        )
+
+    return APIResponse(
+        message=f"Journals with tag '{tag_name}' retrieved successfully",
+        data=feed,
+        success=True,
     )
 
 
@@ -119,41 +286,6 @@ async def delete_journal(
         status="success",
         code=status.HTTP_200_OK,
     )
-
-@router.post("/journal-tags", response_model=APIResponse[JournalTagResponse])
-async def create_journal_tag(
-    journal_tag_data: JournalTagCreate,
-    session: Annotated[Session, Depends(get_session)],
-):
-    journal_tag = JournalTags(**journal_tag_data.model_dump())
-    session.add(journal_tag)
-    session.commit()
-    session.refresh(journal_tag)
-    return APIResponse(
-        message="Journal tag created successfully",
-        data=journal_tag,
-        success=True,
-        status="success",
-        code=status.HTTP_201_CREATED,
-    )
-
-
-@router.get(
-    "/journal-tags/{journal_id}", response_model=APIResponse[List[JournalTagResponse]]
-)
-async def get_journal_tags(
-    journal_id: int,
-    session: Annotated[Session, Depends(get_session)],
-)-> APIResponse[List[JournalTagResponse]]:
-    journal_tags = session.exec(
-        select(JournalTags).where(JournalTags.journal_id == journal_id)
-    ).all()
-    return APIResponse[List[JournalTagResponse]](
-        message="Journal tags retrieved successfully",
-        data=journal_tags,
-        success=True
-    )
-
 
 @router.post(
     "/journal-reactions", response_model=APIResponse[JournalReactionResponse]

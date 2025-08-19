@@ -2,7 +2,28 @@ from datetime import datetime
 from typing import Optional, Annotated, List
 
 from sqlmodel import SQLModel, Field, Relationship
+
 from models.user import User
+
+
+class JournalTagLink(SQLModel, table=True):
+    __tablename__ = "journal_tag_link"
+    journal_id: Annotated[
+        Optional[int],
+        Field(default=None, foreign_key="journals.id", primary_key=True),
+    ]
+    tag_id: Annotated[
+        Optional[int], Field(default=None, foreign_key="tags.id", primary_key=True)
+    ]
+
+
+class Tag(SQLModel, table=True):
+    __tablename__ = "tags"
+    id: Annotated[Optional[int], Field(default=None, primary_key=True)]
+    name: Annotated[str, Field(index=True, unique=True, max_length=100)]
+    journals: List["Journal"] = Relationship(
+        back_populates="tags", link_model=JournalTagLink
+    )
 
 
 class Journal(SQLModel, table=True):
@@ -17,19 +38,16 @@ class Journal(SQLModel, table=True):
     image_url: Annotated[Optional[str], Field(default=None)]
     is_deleted: Annotated[bool, Field(default=False)]
     deleted_at: Annotated[Optional[datetime], Field(default=None)]
-    created_at: Annotated[datetime, Field(default_factory=datetime.utcnow, nullable=False)]
-    updated_at: Annotated[datetime, Field(default_factory=datetime.utcnow, nullable=False)]
+    created_at: Annotated[
+        datetime, Field(default_factory=datetime.utcnow, nullable=False)
+    ]
+    updated_at: Annotated[
+        datetime, Field(default_factory=datetime.utcnow, nullable=False)
+    ]
 
     user: Optional[User] = Relationship(back_populates="journals")
     comments: List["Comment"] = Relationship(back_populates="journal")
-
-class JournalTags(SQLModel, table=True):
-    __tablename__ = "journal_tags"
-
-    id: Annotated[Optional[int], Field(default=None, primary_key=True)]
-    journal_id: Annotated[int, Field(foreign_key="journals.id")]
-    tag: Annotated[str, Field(max_length=100)]
-    created_at: Annotated[datetime, Field(default_factory=datetime.utcnow, nullable=False)]
+    tags: List[Tag] = Relationship(back_populates="journals", link_model=JournalTagLink)
 
 
 class JournalReactions(SQLModel, table=True):

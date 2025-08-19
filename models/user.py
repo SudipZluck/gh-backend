@@ -11,6 +11,7 @@ class User(SQLModel, table=True):
     email: Annotated[str, Field(index=True, unique=True, max_length=255)]
     name: Annotated[str, Field(max_length=255)]
     password_hash: Annotated[str, Field(max_length=255)]
+    profile_image_url: Annotated[Optional[str], Field(max_length=255, default=None)]
     is_active: Annotated[bool, Field(default=True)]
     about: Annotated[Optional[str], Field(max_length=255, default=None)]
     phone: Annotated[Optional[str], Field(max_length=255, default=None)]
