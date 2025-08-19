@@ -13,11 +13,14 @@ class SignupRequest(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: EmailStr
+    profile_image_url: str | None = None
     name: str
     token: str | None = None
     about: str | None = None
+    bio: str | None = None
     phone: str | None = None
     address: str | None = None
+    location: str | None = None
     facebook_url: str | None = None
     instagram_url: str | None = None
     twitter_url: str | None = None
@@ -108,8 +111,10 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     name: Optional[str] = None
     about: Optional[str] = None
+    bio: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    location: Optional[str] = None
     facebook_url: Optional[str] = None
     instagram_url: Optional[str] = None
     twitter_url: Optional[str] = None

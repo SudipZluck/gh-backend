@@ -34,7 +34,7 @@ from schemas.common import APIResponse
 router = APIRouter(prefix="/journals", tags=["journals"])
 
 
-@router.post("/", response_model=APIResponse[JournalResponse])
+@router.post("/create", response_model=APIResponse[JournalResponse])
 async def create_journal(
     journal_data: JournalCreate,
     session: Annotated[Session, Depends(get_session)],
@@ -60,7 +60,7 @@ async def create_journal(
     )
 
 
-@router.get("/", response_model=APIResponse[List[JournalFeedResponse]])
+@router.get("/get-all", response_model=APIResponse[List[JournalFeedResponse]])
 async def get_all_journals(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -146,6 +146,7 @@ async def get_all_journals(
                 is_private=journal.is_private,
             )
         )
+        feed.sort(key=lambda x: x.created_at, reverse=True)
     return APIResponse(
         message="Journals retrieved successfully",
         data=feed,

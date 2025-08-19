@@ -41,52 +41,52 @@ app = FastAPI(
     title="Grateful Hearts API",
     description="API for Grateful Hearts application",
     version="1.0.0",
-    openapi_tags=[
-        {"name": "users", "description": "User management operations"},
-        {"name": "auth", "description": "Authentication operations"},
-        {"name": "journals", "description": "Journal management operations"},
-        {"name": "comments", "description": "Comment management operations"},
-        {"name": "social", "description": "Social features operations"},
-        {"name": "subscriptions", "description": "Subscription management operations"},
-        {"name": "prompts", "description": "Prompt management operations"},
-        {"name": "miscellaneous", "description": "Miscellaneous operations"},
-        {"name": "health", "description": "Health check operations"},
-    ]
+    # openapi_tags=[
+    #     {"name": "users", "description": "User management operations"},
+    #     {"name": "auth", "description": "Authentication operations"},
+    #     {"name": "journals", "description": "Journal management operations"},
+    #     {"name": "comments", "description": "Comment management operations"},
+    #     {"name": "social", "description": "Social features operations"},
+    #     {"name": "subscriptions", "description": "Subscription management operations"},
+    #     {"name": "prompts", "description": "Prompt management operations"},
+    #     {"name": "miscellaneous", "description": "Miscellaneous operations"},
+    #     {"name": "health", "description": "Health check operations"},
+    # ]
 )
 
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-    )
-    
-    # Add security scheme
-    openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT",
-        }
-    }
-    
-    # Add security to all protected endpoints
-    for path in openapi_schema["paths"]:
-        for method in openapi_schema["paths"][path]:
-            if method.lower() in ["post", "put", "delete", "patch"]:
-                # Skip login and signup endpoints
-                if not any(skip_path in path for skip_path in ["/login", "/signup", "/forget-password", "/reset-password"]):
-                    if "security" not in openapi_schema["paths"][path][method]:
-                        openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
-    
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
+# def custom_openapi():
+#     if app.openapi_schema:
+#         return app.openapi_schema
 
-app.openapi = custom_openapi
+#     openapi_schema = get_openapi(
+#         title=app.title,
+#         version=app.version,
+#         description=app.description,
+#         routes=app.routes,
+#     )
+
+#     # Add security scheme
+#     openapi_schema["components"]["securitySchemes"] = {
+#         "BearerAuth": {
+#             "type": "http",
+#             "scheme": "bearer",
+#             "bearerFormat": "JWT",
+#         }
+#     }
+
+#     # Add security to all protected endpoints
+#     for path in openapi_schema["paths"]:
+#         for method in openapi_schema["paths"][path]:
+#             if method.lower() in ["post", "put", "delete", "patch"]:
+#                 # Skip login and signup endpoints
+#                 if not any(skip_path in path for skip_path in ["/login", "/signup", "/forget-password", "/reset-password"]):
+#                     if "security" not in openapi_schema["paths"][path][method]:
+#                         openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+
+#     app.openapi_schema = openapi_schema
+#     return app.openapi_schema
+
+# app.openapi = custom_openapi
 
 register_exception_handlers(app)
 

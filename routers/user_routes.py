@@ -128,7 +128,7 @@ async def reset_password(
 
 
 @router.get("/details", response_model=APIResponse[UserResponse])
-async def get_me(
+async def get_user_details(
     session: Annotated[Session, Depends(get_session)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):

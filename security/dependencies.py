@@ -22,7 +22,6 @@ async def get_current_user(
         )
     token = auth_credentials.credentials
     claims = decode_access_token(token)
-    print(claims)
     subject = claims.get("sub")
     if not subject:
         raise HTTPException(
